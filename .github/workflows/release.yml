@@ -1,0 +1,71 @@
+name: Build, release & deploy site
+
+# Every push to main builds Guarana.app + Guarana.dmg, publishes them as a new
+# GitHub release (marked "latest", so the landing page's download link always
+# gets the newest build) and redeploys the landing page to GitHub Pages.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build app
+        run: scripts/build-app.sh
+
+      - name: Build installer (DMG)
+        run: scripts/make-dmg.sh
+
+      - name: Zip app
+        run: ditto -c -k --keepParent build/Guarana.app build/Guarana.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Guarana-${{ github.run_number }}
+          path: |
+            build/Guarana.dmg
+            build/Guarana.zip
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="1.0.${BUILD_NUMBER}"
+          gh release create "v${VERSION}" build/Guarana.dmg build/Guarana.zip \
+            --target "${GITHUB_SHA}" \
+            --title "Guarana ${VERSION}" \
+            --notes "Automatic build from ${GITHUB_SHA::7}: $(git log -1 --pretty=%s)" \
+            --latest
+
+  site:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

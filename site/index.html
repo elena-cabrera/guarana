@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guarana — keep your Mac wide awake</title>
+<meta name="description" content="A tiny, playful menu bar app that keeps your Mac awake. Pick a time, save your own, and even keep it going with the lid closed.">
+<link rel="icon" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #F2353B;
+    --red-deep: #C71C29;
+    --blush: #FFE3E0;
+    --leaf: #34C26F;
+    --leaf-soft: #DDF6E7;
+    --sun: #FFC94A;
+    --sun-soft: #FFF2CF;
+    --sky: #75B8FF;
+    --sky-soft: #E1F0FF;
+    --ink: #1E1A1A;
+    --muted: #776F6F;
+    --chip: #F7F5F2;
+    --bg: #FFFFFF;
+    --radius: 28px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Nunito", ui-rounded, system-ui, sans-serif; font-weight: 600;
+    -webkit-font-smoothing: antialiased; line-height: 1.55;
+  }
+  h1, h2, h3, .display { font-family: "Fredoka", ui-rounded, system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; line-height: 1.05; margin: 0; }
+  a { color: inherit; }
+  img { max-width: 100%; height: auto; display: block; }
+  .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+  /* Buttons — always round */
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font: 600 18px/1 "Fredoka", ui-rounded, sans-serif; text-decoration: none;
+    padding: 18px 28px; border-radius: 999px; border: 0; cursor: pointer;
+    transition: transform .18s cubic-bezier(.3,1.6,.5,1), box-shadow .18s;
+  }
+  .btn:hover { transform: translateY(-2px) scale(1.03); }
+  .btn:active { transform: scale(.95); }
+  .btn-red { background: var(--red); color: #fff; box-shadow: 0 10px 24px -10px rgba(242,53,59,.7); }
+  .btn-soft { background: var(--chip); color: var(--ink); }
+  .btn-sm { font-size: 15px; padding: 12px 20px; }
+  .btn svg { width: 20px; height: 20px; }
+
+  /* Nav */
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.86); backdrop-filter: blur(14px); }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 76px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 600 24px "Fredoka", sans-serif; }
+  .brand svg { width: 38px; height: 38px; }
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a:not(.btn) { text-decoration: none; color: var(--muted); font-weight: 700; }
+  .nav-links a:not(.btn):hover { color: var(--ink); }
+  @media (max-width: 640px) { .nav-links a:not(.btn) { display: none; } }
+
+  /* Hero */
+  .hero { text-align: center; padding: 72px 0 40px; position: relative; }
+  .pill-tag {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px 8px 10px; border-radius: 999px;
+    background: var(--blush); color: var(--red-deep); font-weight: 800; font-size: 14px; margin-bottom: 28px;
+  }
+  .pill-tag .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--red); display: grid; place-items: center; color: #fff; font-size: 12px; }
+  .hero h1 { font-size: clamp(48px, 9vw, 104px); }
+  .hero h1 .awake { color: var(--red); position: relative; display: inline-block; }
+  .hero h1 .awake::after {
+    content: ""; position: absolute; left: 4%; right: 4%; bottom: -0.04em; height: .16em;
+    background: var(--sun); border-radius: 99px; z-index: -1; transform: rotate(-1.5deg);
+  }
+  .hero p.lead { font-size: clamp(18px, 2.3vw, 22px); color: var(--muted); max-width: 580px; margin: 24px auto 36px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .fine { color: var(--muted); font-size: 14px; margin-top: 16px; }
+
+  /* Floating fruits */
+  .floaty { position: absolute; width: 92px; animation: bob 5s ease-in-out infinite; }
+  .floaty.f1 { left: 2%; top: 90px; transform: rotate(-14deg); }
+  .floaty.f2 { right: 3%; top: 200px; width: 70px; animation-delay: -2s; }
+  .floaty.f3 { left: 10%; top: 330px; width: 52px; animation-delay: -3.5s; }
+  @keyframes bob { 50% { translate: 0 -14px; rotate: 6deg; } }
+  @media (max-width: 900px) { .floaty { display: none; } }
+
+  /* Fruit blink */
+  .eye { transform-origin: 50px 54px; animation: blink 4.2s infinite; }
+  .f2 .eye { animation-delay: -1.3s; }
+  .f3 .eye { animation-delay: -2.6s; }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.08); } }
+
+  /* Stage: fake menu bar + popover */
+  .stage {
+    margin: 64px auto 0; max-width: 940px; border-radius: 40px; position: relative; overflow: hidden;
+    background: radial-gradient(120% 90% at 20% 0%, #FFE9E6 0%, transparent 55%),
+                radial-gradient(90% 80% at 100% 100%, #E5F2FF 0%, transparent 60%),
+                radial-gradient(70% 70% at 0% 100%, #FFF4D6 0%, transparent 60%), #FFF9F7;
+    padding: 0 0 56px;
+  }
+  .menubar {
+    height: 40px; display: flex; align-items: center; justify-content: flex-end; gap: 22px;
+    padding: 0 24px; background: rgba(255,255,255,.7); backdrop-filter: blur(10px);
+    font: 700 14px "Nunito", sans-serif; color: var(--ink);
+  }
+  .menubar .mb-icon { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: rgba(0,0,0,.08); }
+  .menubar .mb-icon svg { width: 18px; height: 18px; }
+  .menubar .ghost { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,.18); }
+  .popover-wrap { display: flex; justify-content: flex-end; padding-right: max(24px, 14%); margin-top: 10px; }
+  .popover {
+    width: 304px; border-radius: 22px; background: #fff; overflow: hidden;
+    box-shadow: 0 30px 60px -20px rgba(80,20,20,.28), 0 0 0 1px rgba(0,0,0,.05);
+  }
+  .stage-copy { position: absolute; left: 7%; top: 110px; max-width: 360px; text-align: left; }
+  .stage-copy h3 { font-size: 34px; margin-bottom: 12px; }
+  .stage-copy p { color: var(--muted); margin: 0; }
+  .toggle-demo { display: inline-flex; gap: 6px; padding: 5px; border-radius: 999px; background: #fff; margin-top: 22px; box-shadow: 0 6px 18px -8px rgba(0,0,0,.18); }
+  .toggle-demo button { font: 600 15px "Fredoka", sans-serif; border: 0; border-radius: 999px; padding: 10px 18px; cursor: pointer; background: transparent; color: var(--muted); transition: all .2s; }
+  .toggle-demo button.on { background: var(--red); color: #fff; }
+  @media (max-width: 820px) {
+    .stage-copy { position: static; padding: 32px 24px 8px; max-width: none; }
+    .popover-wrap { justify-content: center; padding: 0 16px; }
+  }
+
+  /* Sections */
+  section { padding: 110px 0 0; }
+  .eyebrow { font: 800 13px "Nunito", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+  .section-title { font-size: clamp(36px, 5.5vw, 60px); margin: 12px 0 18px; }
+  .section-lead { color: var(--muted); font-size: 19px; max-width: 560px; margin: 0; }
+  .center { text-align: center; }
+  .center .section-lead { margin-inline: auto; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 52px; }
+  @media (max-width: 860px) { .features { grid-template-columns: 1fr; } }
+  .card { border-radius: var(--radius); padding: 30px 28px 32px; position: relative; overflow: hidden; }
+  .card h3 { font-size: 26px; margin: 22px 0 8px; }
+  .card p { margin: 0; color: #5a5252; }
+  .card .badge { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: #fff; font: 600 22px "Fredoka", sans-serif; }
+  .c-red { background: var(--blush); } .c-red .badge { color: var(--red); }
+  .c-sun { background: var(--sun-soft); } .c-sun .badge { color: #C98A00; }
+  .c-leaf { background: var(--leaf-soft); } .c-leaf .badge { color: #1E9A52; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .chip { font: 600 15px "Fredoka", sans-serif; padding: 8px 16px; border-radius: 999px; background: #fff; }
+  .chip.sel { background: var(--red); color: #fff; }
+  .chip.plus { background: transparent; border: 2px dashed rgba(201,138,0,.5); color: #C98A00; }
+  .yn { display: inline-flex; padding: 4px; border-radius: 999px; background: #fff; margin-top: 20px; }
+  .yn span { font: 600 15px "Fredoka", sans-serif; padding: 7px 18px; border-radius: 999px; color: var(--muted); }
+  .yn .on { background: var(--leaf); color: #fff; }
+
+  /* States */
+  .states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 56px; align-items: start; }
+  @media (max-width: 860px) { .states { grid-template-columns: 1fr; max-width: 320px; margin-inline: auto; } }
+  .state figure { margin: 0; }
+  .state img { border-radius: 22px; box-shadow: 0 24px 50px -24px rgba(80,20,20,.3), 0 0 0 1px rgba(0,0,0,.05); }
+  .state figcaption { font: 600 20px "Fredoka", sans-serif; margin-top: 18px; text-align: center; }
+  .state figcaption small { display: block; font: 600 15px "Nunito", sans-serif; color: var(--muted); margin-top: 2px; }
+  .state:nth-child(2) { margin-top: 40px; }
+  @media (max-width: 860px) { .state:nth-child(2) { margin-top: 0; } }
+
+  /* Installer */
+  .install { display: grid; grid-template-columns: 1fr 1.25fr; gap: 56px; align-items: center; }
+  @media (max-width: 860px) { .install { grid-template-columns: 1fr; } }
+  .steps { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 16px; }
+  .steps li { display: flex; gap: 16px; align-items: center; font-size: 18px; }
+  .steps .n { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font: 600 19px "Fredoka", sans-serif; color: #fff; }
+  .dmg { border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px -24px rgba(40,20,20,.35), 0 0 0 1px rgba(0,0,0,.06); background: #fff; }
+  .dmg .bar { height: 30px; background: #F4F2F1; display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+  .dmg .bar i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .dmg .bar b { font: 700 13px "Nunito", sans-serif; margin-left: 10px; color: #555; }
+  .dmg .win { position: relative; }
+  .dmg .win img.icon { position: absolute; width: 17.5%; left: 25%; top: 52.5%; translate: -50% -50%; filter: drop-shadow(0 6px 10px rgba(0,0,0,.15)); }
+  .dmg .win .apps {
+    position: absolute; width: 15%; aspect-ratio: 1.15; left: 75%; top: 52.5%; translate: -50% -50%;
+    background: linear-gradient(#8CC8FF, #4FA3F7); border-radius: 10px 10px 12px 12px; box-shadow: 0 6px 10px rgba(0,0,0,.12);
+    display: grid; place-items: center; color: #fff; font: 600 clamp(14px, 3vw, 26px) "Fredoka", sans-serif;
+  }
+  .dmg .win .label { position: absolute; top: 70%; translate: -50% 0; font: 700 clamp(9px, 1.4vw, 13px) "Nunito", sans-serif; }
+
+  /* FAQ */
+  .faq { max-width: 760px; margin: 48px auto 0; display: grid; gap: 12px; }
+  details { background: var(--chip); border-radius: 26px; padding: 22px 28px; }
+  details[open] { background: #fff; box-shadow: 0 0 0 2px var(--blush); }
+  summary { cursor: pointer; list-style: none; font: 600 20px "Fredoka", sans-serif; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #fff; display: grid; place-items: center; color: var(--red); font-size: 22px; transition: transform .25s; }
+  details[open] summary::after { transform: rotate(45deg); background: var(--blush); }
+  details p { color: var(--muted); margin: 14px 0 0; }
+  code { font-size: .9em; background: var(--chip); padding: 2px 8px; border-radius: 8px; }
+
+  /* Final CTA + footer */
+  .final { margin: 120px auto 0; border-radius: 44px; background: var(--red); color: #fff; text-align: center; padding: 80px 24px; position: relative; overflow: hidden; }
+  .final h2 { font-size: clamp(40px, 6vw, 68px); }
+  .final p { opacity: .9; font-size: 19px; margin: 16px 0 34px; }
+  .final .btn { background: #fff; color: var(--red); }
+  .final .confetti { position: absolute; border-radius: 50%; }
+  .final .big-fruit { width: 120px; margin: 0 auto 24px; }
+  footer { padding: 48px 0 56px; color: var(--muted); font-size: 15px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  @media (prefers-reduced-motion: reduce) { .floaty, .eye { animation: none; } .btn { transition: none; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="g-body" cx="36" cy="38" r="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF6B61"/><stop offset=".55" stop-color="#F2353B"/><stop offset="1" stop-color="#C71C29"/>
+    </radialGradient>
+    <!-- The guarana fruit, awake. 100x100 units, same geometry as the app's FruitArt.swift -->
+    <symbol id="fruit" viewBox="0 0 100 100">
+      <ellipse cx="50" cy="97" rx="23" ry="3" fill="#991a1a" opacity=".10"/>
+      <path d="M50 22 Q50 14 46 10" stroke="#6B3A29" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+      <path d="M51 16 C55 2 68 0 76 4 C74 15 60 19 51 16 Z" fill="#34C26F"/>
+      <path d="M54 13.5 Q63 7 72 5.5" stroke="#fff" stroke-opacity=".45" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+      <path d="M50 20 C73 20 88.5 32 88.5 53 C88.5 75 70 91 54.5 94.5 Q51 96 50 97 Q49 96 45.5 94.5 C30 91 11.5 75 11.5 53 C11.5 32 27 20 50 20 Z" fill="url(#g-body)"/>
+      <ellipse cx="27" cy="38" rx="7" ry="3.5" fill="#fff" opacity=".38" transform="rotate(-34 27 38)"/>
+      <circle cx="22.25" cy="47.75" r="1.75" fill="#fff" opacity=".38"/>
+      <g class="eye">
+        <path d="M25 54 C36.25 24 63.75 24 75 54 C63.75 84 36.25 84 25 54 Z" fill="#FFFAF2" stroke="#C71C29" stroke-width="5" stroke-linejoin="round"/>
+        <circle cx="50" cy="54" r="13.5" fill="#1E1A1A"/>
+        <circle cx="55.5" cy="47.5" r="3" fill="#fff"/>
+        <circle cx="44.25" cy="60.75" r="1.25" fill="#fff"/>
+      </g>
+      <ellipse cx="23" cy="68.25" rx="5" ry="2.75" fill="#FF999E" opacity=".55"/>
+      <ellipse cx="77" cy="68.25" rx="5" ry="2.75" fill="#FF999E" opacity=".55"/>
+    </symbol>
+  </defs>
+</svg>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><svg><use href="#fruit"/></svg>Guarana</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/elena-cabrera/guarana">GitHub</a>
+      <a class="btn btn-red btn-sm" href="https://github.com/elena-cabrera/guarana/releases/latest/download/Guarana.dmg">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <svg class="floaty f1"><use href="#fruit"/></svg>
+  <svg class="floaty f2"><use href="#fruit"/></svg>
+  <svg class="floaty f3"><use href="#fruit"/></svg>
+
+  <div class="pill-tag"><span class="dot">✦</span> A tiny menu bar app for macOS</div>
+  <h1>Keep your Mac<br><span class="awake">wide awake.</span></h1>
+  <p class="lead">Guarana is a little red fruit in your menu bar. Tap it, pick a time, and your Mac stays awake. No dimming, no sleeping, even with the lid closed.</p>
+  <div class="cta">
+    <a class="btn btn-red" href="https://github.com/elena-cabrera/guarana/releases/latest/download/Guarana.dmg">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.6 1.3-.1 1.7-.8 3.3-.8 1.5 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5.9-1.4 1.3-2.8 1.4-2.8-.1 0-2.5-1-2.5-4.2zM13.9 5c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>
+      Download for Mac
+    </a>
+    <a class="btn btn-soft" href="#features">See how it works</a>
+  </div>
+  <div class="fine">Free · macOS 13 Ventura or later · Apple Silicon &amp; Intel · <a href="https://github.com/elena-cabrera/guarana">Open source</a></div>
+
+  <div class="stage">
+    <div class="menubar" aria-hidden="true">
+      <span class="ghost"></span><span class="ghost"></span>
+      <span class="mb-icon"><svg><use href="#fruit"/></svg></span>
+      <span>Fri 9:41</span>
+    </div>
+    <div class="stage-copy">
+      <h3>Awake or asleep?<br>Just look at the fruit.</h3>
+      <p>When Guarana is on, its eye pops open in your menu bar. When it's off, it takes a little nap.</p>
+      <div class="toggle-demo" role="group" aria-label="Preview state">
+        <button class="on" data-state="awake">Awake</button>
+        <button data-state="asleep">Asleep</button>
+      </div>
+    </div>
+    <div class="popover-wrap">
+      <div class="popover"><img id="pop-img" src="assets/popover-awake.png" alt="The Guarana popover: preset times, saved custom times, and Yes/No switches for lid closed and screen on" width="304"></div>
+    </div>
+  </div>
+</header>
+
+<section id="features" class="wrap">
+  <div class="center">
+    <div class="eyebrow">What it does</div>
+    <h2 class="section-title">Small fruit, big energy.</h2>
+    <p class="section-lead">Everything you need to stop your Mac from dozing off, and nothing else.</p>
+  </div>
+  <div class="features">
+    <div class="card c-red">
+      <div class="badge">1h</div>
+      <h3>Wake in one tap</h3>
+      <p>15 minutes, an hour, four, or forever. Pick a time and Guarana counts it down, then lets your Mac rest.</p>
+      <div class="chips"><span class="chip">15m</span><span class="chip">30m</span><span class="chip sel">1h</span><span class="chip">∞</span></div>
+    </div>
+    <div class="card c-sun">
+      <div class="badge">+</div>
+      <h3>Save your own times</h3>
+      <p>Always need 45 minutes for that render, or 8 hours for a download? Save it once and it's always one tap away.</p>
+      <div class="chips"><span class="chip">45m</span><span class="chip">1h 30m</span><span class="chip">8h</span><span class="chip plus">+ add</span></div>
+    </div>
+    <div class="card c-leaf">
+      <div class="badge">◐</div>
+      <h3>Lid closed? Yes.</h3>
+      <p>Close your MacBook and keep it running: downloads, servers, music to a speaker. Choose Yes or No, and change it whenever you like.</p>
+      <div class="yn"><span class="on">Yes</span><span>No</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="center">
+    <div class="eyebrow">Inside the menu</div>
+    <h2 class="section-title">Round, friendly, done.</h2>
+    <p class="section-lead">Everything lives in one small popover. Click the fruit and you're there.</p>
+  </div>
+  <div class="states">
+    <div class="state"><figure><img src="assets/popover-asleep.png" alt="Guarana asleep" width="304"><figcaption>Napping<small>Pick a time to wake it up</small></figcaption></figure></div>
+    <div class="state"><figure><img src="assets/popover-awake.png" alt="Guarana awake with a countdown" width="304"><figcaption>Wide awake<small>A live countdown, stop anytime</small></figcaption></figure></div>
+    <div class="state"><figure><img src="assets/popover-editor.png" alt="Adding a custom time" width="304"><figcaption>Your own time<small>Dial it in, save it, start it</small></figcaption></figure></div>
+  </div>
+</section>
+
+<section id="install" class="wrap">
+  <div class="install">
+    <div>
+      <div class="eyebrow">Install</div>
+      <h2 class="section-title">Drag, drop, wake.</h2>
+      <p class="section-lead">No setup wizard and nothing to configure. Open the disk image and drag the fruit across.</p>
+      <ol class="steps">
+        <li><span class="n" style="background:var(--red)">1</span><span>Download <b>Guarana.dmg</b></span></li>
+        <li><span class="n" style="background:var(--sun)">2</span>Drag Guarana into Applications</li>
+        <li><span class="n" style="background:var(--leaf)">3</span>Click the fruit in your menu bar</li>
+      </ol>
+    </div>
+    <div class="dmg" aria-label="The Guarana installer window">
+      <div class="bar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><b>Guarana</b></div>
+      <div class="win">
+        <img src="assets/installer.png" alt="" width="1280" height="800">
+        <img class="icon" src="assets/app-icon.png" alt="">
+        <div class="apps">A</div>
+        <span class="label" style="left:25%">Guarana</span>
+        <span class="label" style="left:75%">Applications</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="wrap">
+  <div class="center">
+    <div class="eyebrow">Questions</div>
+    <h2 class="section-title">Good to know</h2>
+  </div>
+  <div class="faq">
+    <details open>
+      <summary>How does Guarana keep my Mac awake?</summary>
+      <p>It uses the same built-in macOS power assertions as Apple's <code>caffeinate</code> tool. When your time runs out, or you tap the moon, it lets go and your Mac goes back to its normal sleep settings.</p>
+    </details>
+    <details>
+      <summary>Why does "Lid closed" ask for my password?</summary>
+      <p>macOS only lets an administrator stop a MacBook from sleeping when the lid shuts. The first time you choose Yes, Guarana asks once and adds a tiny rule that allows exactly one thing: turning lid sleep on and off (<code>pmset disablesleep</code>). Nothing else. To remove it, run <code>sudo rm /etc/sudoers.d/guarana</code>.</p>
+    </details>
+    <details>
+      <summary>Is it safe to run with the lid closed?</summary>
+      <p>Yes, but give your Mac some air. Don't zip it into a bag while it's awake. Guarana always turns normal lid sleep back on when your time ends or you quit.</p>
+    </details>
+    <details>
+      <summary>Can I keep the Mac awake but let the screen turn off?</summary>
+      <p>Yes. Set "Screen on" to No, and the display can dim and sleep while everything else keeps running.</p>
+    </details>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="final">
+    <span class="confetti" style="width:22px;height:22px;background:var(--sun);left:8%;top:22%"></span>
+    <span class="confetti" style="width:14px;height:14px;background:#fff;opacity:.5;left:18%;bottom:18%"></span>
+    <span class="confetti" style="width:18px;height:18px;background:var(--leaf);right:10%;top:30%"></span>
+    <span class="confetti" style="width:12px;height:12px;background:var(--sky);right:20%;bottom:20%"></span>
+    <svg class="big-fruit" viewBox="0 0 100 100"><circle cx="50" cy="56" r="44" fill="#fff"/><use href="#fruit" x="12" y="14" width="76" height="76"/></svg>
+    <h2>Stay wide awake.</h2>
+    <p>Free for your Mac. Takes about four seconds to install.</p>
+    <a class="btn" href="https://github.com/elena-cabrera/guarana/releases/latest/download/Guarana.dmg">Download Guarana</a>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Guarana: a little fruit that keeps your Mac awake.</span>
+    <span><a href="https://github.com/elena-cabrera/guarana">Source on GitHub</a> · <a href="https://github.com/elena-cabrera/guarana/releases">All releases</a></span>
+  </div>
+</footer>
+
+<script>
+  // Swap the hero popover between its awake and asleep states.
+  const img = document.getElementById('pop-img');
+  document.querySelectorAll('.toggle-demo button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.toggle-demo button').forEach(x => x.classList.toggle('on', x === b));
+    img.src = `assets/popover-${b.dataset.state}.png`;
+  }));
+</script>
+</body>
+</html>
